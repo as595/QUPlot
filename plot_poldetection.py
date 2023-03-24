@@ -1,6 +1,10 @@
+#! /usr/bin/env python
+
 import pylab as pl
 from scipy.optimize import minimize
 from scipy import stats
+from scipy.ndimage import median_filter
+from scipy.interpolate import UnivariateSpline
 
 from utils import *
 from dataio import *
@@ -75,6 +79,29 @@ def fit_chi(x,y,err,p0):
 
     return p
 
+
+def spline_interpolate(x, y, window=3000):
+    """
+    Calculate a spline fit for the input 1D array.
+
+    Window is an arbitrary smoothing factor, a small number makes the spline
+    follow the scatter very closely, too large a number forces it to be nearly
+    linear.
+
+    Inputs:
+    y           1D array, np.array[float]
+    win         Window size, int
+
+    Returns:
+    filter_y    Filtered input
+    """
+
+    spl = UnivariateSpline(x, y, s=window*x.size)
+
+    xinterp = np.linspace(x.min(), x.max(), 1000)
+    return xinterp, spl(xinterp)
+
+
 # ----------------------------------------------------------
 # ----------------------------------------------------------
 
@@ -125,9 +152,19 @@ ax2 = fig.add_axes([0.7, 0.1, 0.5, 0.5], xlim=(np.min(data.l2),np.max(data.l2)))
 
 p_mag = np.sqrt(data.stokesQn**2 + data.stokesUn**2)
 
+xpfilt, p_mag_filt = spline_interpolate(data.l2[::-1][1:], p_mag[::-1][1:], window=500)
+xqfilt, stokesQ_filt = spline_interpolate(data.l2[::-1][1:], data.stokesQn[::-1][1:], window=500)
+xufilt, stokesU_filt = spline_interpolate(data.l2[::-1][1:], data.stokesUn[::-1][1:], window=500)
+
 ax2.errorbar(data.l2[::-1],p_mag[::-1], yerr=data.noise, fmt='.', c='black', capthick=0, lw=0.1, label='P')
+ax2.plot(xpfilt,p_mag_filt, c='black', lw=1)
+
 ax2.errorbar(data.l2[::-1],data.stokesQn[::-1], yerr=data.noise, fmt='s', ms=3, c='blue', capthick=0, lw=0.1, label='Q')
+ax2.plot(xqfilt,stokesQ_filt, c='blue', lw=1)
+
 ax2.errorbar(data.l2[::-1],data.stokesUn[::-1], yerr=data.noise, fmt='^', ms=3, c='red', capthick=0, lw=0.1, label='U')
+ax2.plot(xufilt,stokesU_filt, c='red', lw=1)
+
 ax2.axhline(y=0, ls=':', c='lightgray')
 ax2.set_ylabel(r"Intensity [$\mu$Jy/beam]", fontsize=12)
 ax2.set_xlabel(r"$\lambda^2$ [m$^2$]", fontsize=12)
